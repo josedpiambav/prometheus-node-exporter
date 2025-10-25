@@ -1,0 +1,55 @@
+{{- if .Values.serviceAccount.create -}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "prometheus-node-exporter.serviceAccountName" . }}
+  labels: 
+    {{- include "prometheus-node-exporter.labels" . | nindent 4 }}
+  {{- with .Values.serviceAccount.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  namespace: {{ include "prometheus-node-exporter.namespace" . }}
+automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
+{{- end -}}
+
+{{- if .Values.kubeRBACProxy.enabled true -}}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "prometheus-node-exporter.fullname" . }}
+  labels:
+    {{- include "prometheus-node-exporter.labels" . | nindent 4 }}
+  {{- with .Values.serviceAccount.rbac.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+rules:
+  - apiGroups: [ "authentication.k8s.io" ]
+    resources:
+      - tokenreviews
+    verbs: [ "create" ]
+  - apiGroups: [ "authorization.k8s.io" ]
+    resources:
+      - subjectaccessreviews
+    verbs: [ "create" ]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "prometheus-node-exporter.fullname" . }}
+  labels:
+    {{- include "prometheus-node-exporter.labels" . | nindent 4 }}
+  {{- with .Values.serviceAccount.rbac.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "prometheus-node-exporter.fullname" . }}
+subjects:
+- kind: ServiceAccount
+  name: {{ include "prometheus-node-exporter.serviceAccountName" . }}
+  namespace: {{ include "prometheus-node-exporter.namespace" . }}
+{{- end -}}
+
