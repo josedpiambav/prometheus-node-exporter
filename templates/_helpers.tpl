@@ -65,13 +65,6 @@ Create the name of the service account to use
 {{- end }}
 
 {{/*
-The image to use
-*/}}
-{{- define "prometheus-node-exporter.image" -}}
-{{- printf "%s/%s:%s" .Values.image.registry .Values.image.repository (default (printf "v%s" .Chart.AppVersion) .Values.image.tag) }}
-{{- end }}
-
-{{/*
 Allow the release namespace to be overridden for multi-namespace deployments in combined charts
 */}}
 {{- define "prometheus-node-exporter.namespace" -}}
@@ -79,6 +72,21 @@ Allow the release namespace to be overridden for multi-namespace deployments in 
     {{- .Values.namespaceOverride }}
   {{- else }}
     {{- .Release.Namespace }}
+  {{- end }}
+{{- end }}
+
+{{/*
+Create the namespace name of the pod monitor
+*/}}
+{{- define "prometheus-node-exporter.podmonitor-namespace" -}}
+  {{- if .Values.namespaceOverride }}
+    {{- .Values.namespaceOverride }}
+  {{- else }}
+    {{- if .Values.prometheus.podMonitor.namespace }}
+      {{- .Values.prometheus.podMonitor.namespace }}
+    {{- else }}
+      {{- .Release.Namespace }}
+    {{- end }}
   {{- end }}
 {{- end }}
 
@@ -97,87 +105,151 @@ Create the namespace name of the service monitor
   {{- end }}
 {{- end }}
 
-{{/* Sets default scrape limits for servicemonitor */}}
-{{- define "servicemonitor.scrapeLimits" -}}
-{{- with .sampleLimit }}
-sampleLimit: {{ . }}
+{{/*
+kube-state-metrics.podSecurityContext: Returns the pod security context
+*/}}
+{{- define "prometheus-node-exporter.podSecurityContext" -}}
+  {{- if .Values.podSecurityContext -}}
+    {{- with .Values.podSecurityContext }}
+      {{- if .enabled }}
+        fsGroup: {{ .fsGroup | default 1000 }}
+        runAsGroup: {{ .runAsGroup | default 1000 }}
+        runAsNonRoot: {{ .runAsNonRoot | default true }}
+        runAsUser: {{ .runAsUser | default 1000 }}
+        {{- if .fsGroupChangePolicy }}
+        fsGroupChangePolicy: {{ .fsGroupChangePolicy }}
+        {{- end }}
+        {{- if .seccompProfile }}
+        seccompProfile:
+          {{ toYaml .seccompProfile | nindent 2 }}
+        {{- end }}
+      {{- else }}
+        {{- /* Fallback to securityContext for backward compatibility */}}
+        {{- if .Values.securityContext }}
+          fsGroup: {{ .Values.securityContext.fsGroup | default 65534 }}
+          runAsGroup: {{ .Values.securityContext.runAsGroup | default 65534 }}
+          runAsNonRoot: {{ .Values.securityContext.runAsNonRoot | default true }}
+          runAsUser: {{ .Values.securityContext.runAsUser | default 65534 }}
+        {{- end }}
+    {{- end }}
+  {{- end }}
 {{- end }}
-{{- with .targetLimit }}
-targetLimit: {{ . }}
-{{- end }}
-{{- with .labelLimit }}
-labelLimit: {{ . }}
-{{- end }}
-{{- with .labelNameLengthLimit }}
-labelNameLengthLimit: {{ . }}
-{{- end }}
-{{- with .labelValueLengthLimit }}
-labelValueLengthLimit: {{ . }}
-{{- end }}
+
+{{/*
+kube-state-metrics.containerSecurityContext: Returns the container security context
+*/}}
+{{- define "prometheus-node-exporter.containerSecurityContext" -}}
+  {{- if .Values.containerSecurityContext -}}
+    {{- with .Values.containerSecurityContext }}
+      {{- if .enabled }}
+        allowPrivilegeEscalation: {{ .allowPrivilegeEscalation | default false }}
+        readOnlyRootFilesystem: {{ .readOnlyRootFilesystem | default true }}
+        runAsNonRoot: {{ .runAsNonRoot | default true }}
+        runAsUser: {{ .runAsUser | default 1000 }}
+        {{- if .capabilities }}
+        capabilities:
+        {{ toYaml .capabilities | nindent 2 }}
+        {{- else }}
+        capabilities:
+          drop:
+          - ALL
+        {{- end }}
+        {{- if .seccompProfile }}
+        seccompProfile:
+        {{ toYaml .seccompProfile | nindent 2 }}
+        {{- end }}
+      {{- end }}
+    {{- else }}
+      {{- /* Fallback values */}}
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+      runAsUser: 65534
+      capabilities:
+        drop:
+        - ALL
+    {{- end }}
 {{- end }}
 
 {{/*
 Formats imagePullSecrets. Input is (dict "Values" .Values "imagePullSecrets" .{specific imagePullSecrets})
 */}}
 {{- define "prometheus-node-exporter.imagePullSecrets" -}}
-{{- range .imagePullSecrets }}
-  {{- if eq (typeOf .) "map[string]interface {}" }}
-- {{ toYaml . | trim }}
-  {{- else }}
-- name: {{ . }}
+  {{- range .imagePullSecrets }}
+    {{- if eq (typeOf .) "map[string]interface {}" }}
+  - {{ toYaml . | trim }}
+    {{- else }}
+  - name: {{ . }}
+    {{- end }}
   {{- end }}
-{{- end }}
 {{- end -}}
 
 {{/*
-Create the namespace name of the pod monitor
+The image to use for kube-state-metrics
 */}}
-{{- define "prometheus-node-exporter.podmonitor-namespace" -}}
-  {{- if .Values.namespaceOverride }}
-    {{- .Values.namespaceOverride }}
-  {{- else }}
-    {{- if .Values.prometheus.podMonitor.namespace }}
-      {{- .Values.prometheus.podMonitor.namespace }}
-    {{- else }}
-      {{- .Release.Namespace }}
-    {{- end }}
+{{- define "prometheus-node-exporter.image" -}}
+{{- printf "%s/%s:%s" .Values.image.registry .Values.image.repository (default (printf "v%s" .Chart.AppVersion) .Values.image.tag) }}
+{{- end }}
+
+{{/*
+Sets default scrape limits for podmonitor
+*/}}
+{{- define "podmonitor.scrapeLimits" -}}
+  {{- with .sampleLimit }}
+  sampleLimit: {{ . }}
+  {{- end }}
+  {{- with .targetLimit }}
+  targetLimit: {{ . }}
+  {{- end }}
+  {{- with .labelLimit }}
+  labelLimit: {{ . }}
+  {{- end }}
+  {{- with .labelNameLengthLimit }}
+  labelNameLengthLimit: {{ . }}
+  {{- end }}
+  {{- with .labelValueLengthLimit }}
+  labelValueLengthLimit: {{ . }}
   {{- end }}
 {{- end }}
 
-{{/* Sets default scrape limits for podmonitor */}}
-{{- define "podmonitor.scrapeLimits" -}}
-{{- with .sampleLimit }}
-sampleLimit: {{ . }}
-{{- end }}
-{{- with .targetLimit }}
-targetLimit: {{ . }}
-{{- end }}
-{{- with .labelLimit }}
-labelLimit: {{ . }}
-{{- end }}
-{{- with .labelNameLengthLimit }}
-labelNameLengthLimit: {{ . }}
-{{- end }}
-{{- with .labelValueLengthLimit }}
-labelValueLengthLimit: {{ . }}
-{{- end }}
-{{- end }}
+{{/*
+Sets default scrape limits for servicemonitor
+*/}}
+{{- define "servicemonitor.scrapeLimits" -}}
+  {{- with .sampleLimit }}
+  sampleLimit: {{ . }}
+  {{- end }}
+  {{- with .targetLimit }}
+  targetLimit: {{ . }}
+  {{- end }}
+  {{- with .labelLimit }}
+  labelLimit: {{ . }}
+  {{- end }}
+  {{- with .labelNameLengthLimit }}
+  labelNameLengthLimit: {{ . }}
+  {{- end }}
+  {{- with .labelValueLengthLimit }}
+  labelValueLengthLimit: {{ . }}
+  {{- end }}
+{{- end -}}
 
-{{/* Sets sidecar volumeMounts */}}
+{{/*
+Sets sidecar volumeMounts
+*/}}
 {{- define "prometheus-node-exporter.sidecarVolumeMounts" -}}
-{{- range $_, $mount := $.Values.sidecarVolumeMount }}
-- name: {{ $mount.name }}
-  mountPath: {{ $mount.mountPath }}
-  readOnly: {{ $mount.readOnly }}
-{{- end }}
-{{- range $_, $mount := $.Values.sidecarHostVolumeMounts }}
-- name: {{ $mount.name }}
-  mountPath: {{ $mount.mountPath }}
-  readOnly: {{ $mount.readOnly }}
-{{- if $mount.mountPropagation }}
-  mountPropagation: {{ $mount.mountPropagation }}
-{{- end }}
-{{- end }}
+  {{- range $_, $mount := $.Values.sidecarVolumeMount }}
+  - name: {{ $mount.name }}
+    mountPath: {{ $mount.mountPath }}
+    readOnly: {{ $mount.readOnly }}
+  {{- end }}
+  {{- range $_, $mount := $.Values.sidecarHostVolumeMounts }}
+  - name: {{ $mount.name }}
+    mountPath: {{ $mount.mountPath }}
+    readOnly: {{ $mount.readOnly }}
+  {{- if $mount.mountPropagation }}
+    mountPropagation: {{ $mount.mountPropagation }}
+  {{- end }}
+  {{- end }}
 {{- end }}
 
 {{/*

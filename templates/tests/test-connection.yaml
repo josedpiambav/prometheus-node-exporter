@@ -1,0 +1,43 @@
+{{- if .Values.testFramework.enabled }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "prometheus-node-exporter.fullname" . }}-test-connection"
+  labels:
+    {{- include "prometheus-node-exporter.labels" . | nindent 4 }}
+    app.kubernetes.io/name: {{ include "prometheus-node-exporter.name" . }}-test
+  annotations:
+    "helm.sh/hook-weight": "0"
+    {{- with .Values.testFramework.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  containers:
+  - name: test-connection
+    image: busybox
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -ex
+        echo "Testing connection to prometheus-node-exporter service..."
+        
+        # Test HTTP connectivity to metrics endpoint
+        if nc -z -w 5 {{ include "prometheus-node-exporter.fullname" . }} {{ .Values.service.port }}; then
+          echo "✅ Successfully connected to service on port {{ .Values.service.port }}"
+        else
+          echo "❌ Failed to connect to service on port {{ .Values.service.port }}"
+          exit 1
+        fi
+
+        # Test metrics endpoint response
+        if wget -q -O- -T 5 http://{{ include "prometheus-node-exporter.fullname" . }}:{{ .Values.service.port }}/metrics | head -5 | grep -q "node_"; then
+          echo "✅ Metrics endpoint is responding with valid node metrics"
+        else
+          echo "❌ Metrics endpoint not returning expected data"
+          exit 1
+        fi
+
+        echo "✅ All connection tests passed!"
+  restartPolicy: Never
+{{- end }}

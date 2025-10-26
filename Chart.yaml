@@ -6,14 +6,14 @@ description: |
   Base Helm Chart:
   - Name: prometheus-node-exporter
   - Repository: prometheus-community https://prometheus-community.github.io/helm-charts
-  - Version: 4.49.0
+  - Version: 4.48.0
   - Source: https://github.com/prometheus-community/helm-charts/tree/main/charts/prometheus-node-exporter
 home: https://github.com/prometheus/node_exporter/
 sources:
   - https://github.com/prometheus/node_exporter/
 type: application
 version: 0.0.1
-appVersion: 1.10.0
+appVersion: 1.9.1
 kubeVersion: ">=1.25.0-0"
 keywords:
   - node-exporter

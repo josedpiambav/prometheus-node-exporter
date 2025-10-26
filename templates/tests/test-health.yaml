@@ -1,0 +1,57 @@
+{{- if .Values.testFramework.enabled }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "prometheus-node-exporter.fullname" . }}-test-health"
+  labels:
+    {{- include "prometheus-node-exporter.labels" . | nindent 4 }}
+    app.kubernetes.io/name: {{ include "prometheus-node-exporter.name" . }}-test
+  annotations:
+    "helm.sh/hook-weight": "1"
+    {{- with .Values.testFramework.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  containers:
+  - name: test-health
+    image: busybox
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -ex
+        echo "Testing health endpoints..."
+
+        {{- if .Values.kubeRBACProxy.enabled }}
+        # When kubeRBACProxy is enabled, test its health endpoints
+        echo "Testing kubeRBACProxy health endpoints..."
+        
+        # Test liveness endpoint through proxy
+        if wget -q -O- -T 5 http://{{ include "prometheus-node-exporter.fullname" . }}:{{ .Values.service.port }}/livez | grep -q "ok"; then
+          echo "✅ Liveness endpoint is healthy"
+        else
+          echo "❌ Liveness endpoint not responding correctly"
+          exit 1
+        fi
+
+        # Test readiness endpoint through proxy
+        if wget -q -O- -T 5 http://{{ include "prometheus-node-exporter.fullname" . }}:{{ .Values.service.port }}/readyz | grep -q "ok"; then
+          echo "✅ Readiness endpoint is healthy"
+        else
+          echo "❌ Readiness endpoint not responding correctly"
+          exit 1
+        fi
+        {{- else }}
+        # Test node exporter directly
+        echo "Testing node exporter health via metrics endpoint..."
+        if wget -q -O- -T 5 http://{{ include "prometheus-node-exporter.fullname" . }}:{{ .Values.service.port }}/metrics | head -1 | grep -q "node_"; then
+          echo "✅ Node exporter is healthy (serving metrics)"
+        else
+          echo "❌ Node exporter not responding correctly"
+          exit 1
+        fi
+        {{- end }}
+
+        echo "✅ All health checks passed!"
+  restartPolicy: Never
+{{- end }}

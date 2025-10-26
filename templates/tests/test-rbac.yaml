@@ -1,0 +1,43 @@
+{{- if and .Values.testFramework.enabled .Values.rbac.create }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "prometheus-node-exporter.fullname" . }}-test-rbac"
+  labels:
+    {{- include "prometheus-node-exporter.labels" . | nindent 4 }}
+    app.kubernetes.io/name: {{ include "prometheus-node-exporter.name" . }}-test
+  annotations:
+    "helm.sh/hook-weight": "3"
+    {{- with .Values.testFramework.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  serviceAccountName: {{ include "prometheus-node-exporter.serviceAccountName" . }}
+  containers:
+  - name: test-rbac
+    image: busybox
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -ex
+        echo "Testing RBAC permissions..."
+
+        # Test if we can list pods (basic Kubernetes API access)
+        if timeout 10 sh -c 'until kubectl get pods -n {{ .Release.Namespace }} --field-selector=status.phase=Running | grep -q "prometheus-node-exporter"; do sleep 1; done'; then
+          echo "✅ Can access Kubernetes API and see node-exporter pods"
+        else
+          echo "❌ Cannot access Kubernetes API or cannot find node-exporter pods"
+          exit 1
+        fi
+
+        # Test if we can get nodes (node-exporter might need this)
+        if kubectl get nodes --request-timeout=5s > /dev/null 2>&1; then
+          echo "✅ Can list cluster nodes"
+        else
+          echo "⚠️  Cannot list cluster nodes - may affect some metrics"
+        fi
+
+        echo "✅ RBAC tests passed!"
+  restartPolicy: Never
+{{- end }}
