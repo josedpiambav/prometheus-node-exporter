@@ -3,7 +3,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: {{ include "prometheus-node-exporter.serviceAccountName" . }}
-  labels: 
+  labels:
     {{- include "prometheus-node-exporter.labels" . | nindent 4 }}
   {{- with .Values.serviceAccount.annotations }}
   annotations:
@@ -11,45 +11,46 @@ metadata:
   {{- end }}
   namespace: {{ include "prometheus-node-exporter.namespace" . }}
 automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
-{{- end -}}
+{{- end }}
 
-{{- if and (eq .Values.rbac.create true) (eq .Values.kubeRBACProxy.enabled true) -}}
+{{- if and .Values.rbac.create .Values.kubeRBACProxy.enabled -}}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "prometheus-node-exporter.fullname" . }}
+  name: {{ include "prometheus-node-exporter.fullname" . }}-rbac-proxy
   labels:
     {{- include "prometheus-node-exporter.labels" . | nindent 4 }}
-  {{- with .Values.serviceAccount.rbac.annotations }}
+  {{- with .Values.rbac.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
+  {{- end }}
 rules:
-  - apiGroups: [ "authentication.k8s.io" ]
+  - apiGroups: ["authentication.k8s.io"]
     resources:
       - tokenreviews
-    verbs: [ "create" ]
-  - apiGroups: [ "authorization.k8s.io" ]
+    verbs: ["create"]
+  - apiGroups: ["authorization.k8s.io"]
     resources:
       - subjectaccessreviews
-    verbs: [ "create" ]
+    verbs: ["create"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ include "prometheus-node-exporter.fullname" . }}
+  name: {{ include "prometheus-node-exporter.fullname" . }}-rbac-proxy
   labels:
     {{- include "prometheus-node-exporter.labels" . | nindent 4 }}
-  {{- with .Values.serviceAccount.rbac.annotations }}
+  {{- with .Values.rbac.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
+  {{- end }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: {{ include "prometheus-node-exporter.fullname" . }}
+  name: {{ include "prometheus-node-exporter.fullname" . }}-rbac-proxy
 subjects:
-- kind: ServiceAccount
-  name: {{ include "prometheus-node-exporter.serviceAccountName" . }}
-  namespace: {{ include "prometheus-node-exporter.namespace" . }}
-{{- end -}}
-
+  - kind: ServiceAccount
+    name: {{ include "prometheus-node-exporter.serviceAccountName" . }}
+    namespace: {{ include "prometheus-node-exporter.namespace" . }}
+{{- end }}
