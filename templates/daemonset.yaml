@@ -2,13 +2,13 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: {{ include "prometheus-node-exporter.fullname" . }}
+  namespace: {{ include "prometheus-node-exporter.namespace" . }}
   labels:
     {{- include "prometheus-node-exporter.labels" . | nindent 4 }}
   {{- with .Values.daemonsetAnnotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
-  namespace: {{ include "prometheus-node-exporter.namespace" . }}
 spec:
   selector:
     matchLabels:
@@ -31,13 +31,10 @@ spec:
         {{- end }}
     spec:
       automountServiceAccountToken: {{ ternary true false (or .Values.serviceAccount.automountServiceAccountToken .Values.kubeRBACProxy.enabled) }}
-      {{- if .Values.podSecurityContext.enabled }}
+      {{- with .Values.securityContext }}
       securityContext:
-        {{- include "kube-state-metrics.podSecurityContext" . | nindent 8 }}
-      {{- else if .Values.securityContext.enabled }}
-      securityContext: {{- omit .Values.securityContext "enabled" | toYaml | nindent 8 }}
+        {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- include "prometheus-node-exporter.imagePullSecrets" . | nindent 8 }}
       {{- with .Values.priorityClassName }}
       priorityClassName: {{ . }}
       {{- end }}
@@ -60,7 +57,7 @@ spec:
             - --path.sysfs=/host/sys
             {{- if .Values.hostRootFsMount.enabled }}
             - --path.rootfs=/host/root
-            {{- if semverCompare ">=1.4.0-0" (coalesce .Values.image.tag .Chart.AppVersion) }}
+            {{- if semverCompare ">=1.4.0-0" (coalesce .Values.version .Values.image.tag .Chart.AppVersion) }}
             - --path.udev.data=/host/root/run/udev/data
             {{- end }}
             {{- end }}
@@ -68,12 +65,9 @@ spec:
             {{- with .Values.extraArgs }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
-          {{- if .Values.containerSecurityContext.enabled }}
+          {{- with .Values.containerSecurityContext }}
           securityContext:
-            {{- include "prometheus-node-exporter.containerSecurityContext" . | nindent 12 }}
-          {{- else if .Values.containerSecurityContext }}
-          securityContext:
-          {{ toYaml .Values.containerSecurityContext | nindent 12 }}
+            {{- toYaml . | nindent 12 }}
           {{- end }}
           env:
             - name: HOST_IP
@@ -222,7 +216,11 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
           imagePullPolicy: {{ .Values.kubeRBACProxy.image.pullPolicy }}
-          image: {{ include "kubeRBACProxy.image" . }}
+          {{- if .Values.kubeRBACProxy.image.sha }}
+          image: "{{ .Values.global.imageRegistry | default .Values.kubeRBACProxy.image.registry}}/{{ .Values.kubeRBACProxy.image.repository }}:{{ .Values.kubeRBACProxy.image.tag }}@sha256:{{ .Values.kubeRBACProxy.image.sha }}"
+          {{- else }}
+          image: "{{ .Values.global.imageRegistry | default .Values.kubeRBACProxy.image.registry}}/{{ .Values.kubeRBACProxy.image.repository }}:{{ .Values.kubeRBACProxy.image.tag }}"
+          {{- end }}
           ports:
             - containerPort: {{ .Values.service.port}}
               name: {{ .Values.kubeRBACProxy.portName }}
@@ -258,15 +256,15 @@ spec:
               value: {{ $value | quote }}
             {{- end }}
           {{- end }}
-          {{- if .Values.containerSecurityContext.enabled }}
-          securityContext:
-            {{- include "prometheus-node-exporter.containerSecurityContext" . | nindent 12 }}
-          {{- else if .Values.kubeRBACProxy.containerSecurityContext }}
+          {{- if .Values.kubeRBACProxy.containerSecurityContext }}
           securityContext:
           {{ toYaml .Values.kubeRBACProxy.containerSecurityContext | nindent 12 }}
-          {{- end }}
         {{- end }}
         {{- end }}
+      {{- if or .Values.imagePullSecrets .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- include "prometheus-node-exporter.imagePullSecrets" (dict "Values" .Values "imagePullSecrets" .Values.imagePullSecrets) | indent 8 }}
+      {{- end }}
       hostNetwork: {{ .Values.hostNetwork }}
       hostPID: {{ .Values.hostPID }}
       hostIPC: {{ .Values.hostIPC }}

@@ -3,9 +3,9 @@ apiVersion: autoscaling.k8s.io/v1
 kind: VerticalPodAutoscaler
 metadata:
   name: {{ include "prometheus-node-exporter.fullname" . }}
+  namespace: {{ include "prometheus-node-exporter.namespace" . }}
   labels:
     {{- include "prometheus-node-exporter.labels" . | nindent 4 }}
-  namespace: {{ include "prometheus-node-exporter.namespace" . }}
 spec:
   {{- with .Values.verticalPodAutoscaler.recommenders }}
   recommenders:

@@ -1,29 +1,28 @@
-apiVersion: v2
-name: prometheus-node-exporter
-description: |
-  A Helm chart for prometheus node-exporter
-  
-  Base Helm Chart:
-  - Name: prometheus-node-exporter
-  - Repository: prometheus-community https://prometheus-community.github.io/helm-charts
-  - Version: 4.48.0
-  - Source: https://github.com/prometheus-community/helm-charts/tree/main/charts/prometheus-node-exporter
-home: https://github.com/prometheus/node_exporter/
-sources:
-  - https://github.com/prometheus/node_exporter/
-type: application
-version: 0.0.1
-appVersion: 1.9.1
-kubeVersion: ">=1.25.0-0"
-keywords:
-  - node-exporter
-  - prometheus
-  - exporter
-maintainers:
-  - name: Jose Piamba
-    email: jose.piamba@gaiavation.com
 annotations:
-  "artifacthub.io/license": Apache-2.0
-  "artifacthub.io/links": |
+  artifacthub.io/license: Apache-2.0
+  artifacthub.io/links: |
     - name: Chart Source
       url: https://github.com/prometheus-community/helm-charts
+apiVersion: v2
+appVersion: 1.9.1
+description: A Helm chart for prometheus node-exporter
+home: https://github.com/prometheus/node_exporter/
+keywords:
+- node-exporter
+- prometheus
+- exporter
+maintainers:
+- email: gianrubio@gmail.com
+  name: gianrubio
+  url: https://github.com/gianrubio
+- email: zanhsieh@gmail.com
+  name: zanhsieh
+  url: https://github.com/zanhsieh
+- email: rootsandtrees@posteo.de
+  name: zeritti
+  url: https://github.com/zeritti
+name: prometheus-node-exporter
+sources:
+- https://github.com/prometheus/node_exporter/
+type: application
+version: 4.48.0

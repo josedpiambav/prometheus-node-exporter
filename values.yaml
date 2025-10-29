@@ -1,8 +1,6 @@
-# yaml-language-server: $schema=values.schema.json
 # Default values for prometheus-node-exporter.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
-
 image:
   registry: quay.io
   repository: prometheus/node-exporter
@@ -19,6 +17,23 @@ fullnameOverride: ""
 # Number of old history to retain to allow rollback
 # Default Kubernetes value is set to 10
 revisionHistoryLimit: 10
+
+global:
+  # To help compatibility with other charts which use global.imagePullSecrets.
+  # Allow either an array of {name: pullSecret} maps (k8s-style), or an array of strings (more common helm-style).
+  # global:
+  #   imagePullSecrets:
+  #   - name: pullSecret1
+  #   - name: pullSecret2
+  # or
+  # global:
+  #   imagePullSecrets:
+  #   - pullSecret1
+  #   - pullSecret2
+  imagePullSecrets: []
+  #
+  # Allow parent charts to override registry hostname
+  imageRegistry: ""
 
 # Configure kube-rbac-proxy. When enabled, creates a kube-rbac-proxy to protect the node-exporter http endpoint.
 # The requests are served through the same service but requests are HTTPS.
@@ -175,7 +190,7 @@ prometheus:
 
     scheme: http
     basicAuth: {}
-    bearerTokenFile: ""
+    bearerTokenFile:
     tlsConfig: {}
 
     ## proxyUrl: URL of a proxy that should be used for scraping.
@@ -308,7 +323,6 @@ prometheus:
     # Only valid in Prometheus versions 2.27.0 and newer.
     labelValueLengthLimit: 0
 
-
 ## Customize the updateStrategy if set
 updateStrategy:
   type: RollingUpdate
@@ -339,44 +353,19 @@ serviceAccount:
   name:
   annotations: {}
   imagePullSecrets: []
-  automount: false
+  automountServiceAccountToken: false
 
 securityContext:
-  enabled: true
+  fsGroup: 65534
+  runAsGroup: 65534
   runAsNonRoot: true
-  runAsUser: 1000
-  runAsGroup: 1000
-  fsGroup: 1000
-  seccompProfile:
-    type: RuntimeDefault
+  runAsUser: 65534
 
-# Pod Security Context
-podSecurityContext:
-  enabled: true
-  runAsNonRoot: true
-  runAsUser: 1000
-  runAsGroup: 1000
-  fsGroup: 1000
-  fsGroupChangePolicy: "OnRootMismatch"
-  # RuntimeDefault seccomp profile for container isolation
-  seccompProfile:
-    type: RuntimeDefault
-
-# Container Security Context
 containerSecurityContext:
-  enabled: true
-  runAsNonRoot: true
-  runAsUser: 1000
-  runAsGroup: 1000
   readOnlyRootFilesystem: true
-  # Drop all capabilities and prevent privilege escalation
-  allowPrivilegeEscalation: false
-  capabilities:
-    drop:
-      - ALL
-  # Use runtime default seccomp profile
-  seccompProfile:
-    type: RuntimeDefault
+  # capabilities:
+  #   add:
+  #   - SYS_TIME
 
 rbac:
   ## If true, create & use RBAC resources
@@ -623,8 +612,5 @@ extraVolumeMounts: []
   #   mountPath: /extra
   #   readOnly: true
 
-testFramework:
-  enabled: false
-  annotations:
-    "helm.sh/hook": test
-    "helm.sh/hook-delete-policy": before-creation,hook-succeeded
+# Override version of app, required if image.tag is defined and does not follow semver
+version: ""
